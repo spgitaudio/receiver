@@ -55,35 +55,57 @@ function saveRecordingAsWav() {
 
 // 🎙 WAV Encoding Function (Stereo Support)
 function encodeWav(audioBuffer) {
-    let numOfChannels = audioBuffer.numberOfChannels;
+    let numOfChannels = audioBuffer.numberOfChannels; // ✅ Detects number of channels
     let sampleRate = audioBuffer.sampleRate;
-    let samples = audioBuffer.getChannelData(0);
-    let buffer = new ArrayBuffer(44 + samples.length * 2);
+
+    let samplesL = audioBuffer.getChannelData(0); // Left Channel
+    let samplesR = numOfChannels > 1 ? audioBuffer.getChannelData(1) : samplesL; // Right Channel (or duplicate Left if mono)
+
+    console.log("🔍 Encoding WAV:");
+    console.log("🎙 Number of Channels:", numOfChannels);
+    console.log("🎚 Sample Rate:", sampleRate);
+    console.log("🎧 Total Left Samples:", samplesL.length);
+    console.log("🎤 Total Right Samples:", samplesR.length);
+
+    let interleaved = new Float32Array(samplesL.length * 2);
+    for (let i = 0; i < samplesL.length; i++) {
+        interleaved[i * 2] = samplesL[i]; // Left
+        interleaved[i * 2 + 1] = samplesR[i]; // Right
+    }
+
+    let buffer = new ArrayBuffer(44 + interleaved.length * 2);
     let view = new DataView(buffer);
 
-    // WAV Header
+    // Write WAV Header
     writeString(view, 0, "RIFF");
-    view.setUint32(4, 36 + samples.length * 2, true);
+    view.setUint32(4, 36 + interleaved.length * 2, true);
     writeString(view, 8, "WAVE");
     writeString(view, 12, "fmt ");
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
-    view.setUint16(22, numOfChannels, true);
+    view.setUint16(22, 2, true); // ✅ Ensure 2 channels
     view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * numOfChannels * 2, true);
-    view.setUint16(32, numOfChannels * 2, true);
+    view.setUint32(28, sampleRate * 2 * 2, true);
+    view.setUint16(32, 2 * 2, true);
     view.setUint16(34, 16, true);
     writeString(view, 36, "data");
-    view.setUint32(40, samples.length * 2, true);
+    view.setUint32(40, interleaved.length * 2, true);
 
-    // PCM Data
+    // Write PCM Data
     let offset = 44;
-    for (let i = 0; i < samples.length; i++, offset += 2) {
-        let s = Math.max(-1, Math.min(1, samples[i]));
+    for (let i = 0; i < interleaved.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, interleaved[i]));
         view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     }
 
     return buffer;
+}
+
+// 📝 Write ASCII Characters to WAV Header
+function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+    }
 }
 
 // 📝 Write ASCII Characters to WAV Header
