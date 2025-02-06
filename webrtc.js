@@ -8,25 +8,45 @@ peerConnection.onicecandidate = event => {
     }
 };
 
-// 📥 Accepts the SDP Offer from the Caller
-async function setOffer() {
-    let offer = JSON.parse(document.getElementById("offer").value);
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    console.log("📡 SDP Offer Set! Creating Answer...");
+// 📡 Modify SDP to Force Opus & Stereo Decoding
+function forceOpusSDP(sdp) {
+    console.log("🔧 Modifying SDP for Opus Stereo Decoding...");
+    return sdp
+        .replace(/a=rtpmap:\d+ opus\/\d+/g, "a=rtpmap:111 opus/48000/2") // Force Opus codec with stereo
+        .replace(/a=fmtp:\d+ /g, "a=fmtp:111 stereo=1; sprop-stereo=1; ") // Ensure stereo Opus
+        .replace(/a=sendrecv/g, "a=recvonly"); // Receiver only receives media
 }
 
-// 📡 Creates SDP Answer & Displays It for the Caller
+// 📡 Accept SDP Offer from Caller
+async function setOffer() {
+    let offer = JSON.parse(document.getElementById("offer").value);
+    offer.sdp = forceOpusSDP(offer.sdp); // Modify SDP before setting
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    console.log("📡 SDP Offer Set! Now click 'Create Answer'.");
+}
+
+// 📡 Create & Send SDP Answer (Called Separately)
 async function createAnswer() {
+    console.log("📡 Creating SDP Answer...");
     let answer = await peerConnection.createAnswer();
+    answer.sdp = forceOpusSDP(answer.sdp); // Modify SDP for Opus stereo
     await peerConnection.setLocalDescription(answer);
     document.getElementById("answer").value = JSON.stringify(answer);
     console.log("📡 SDP Answer Created:", JSON.stringify(answer));
 }
 
-// 🎧 When Audio Stream is Received, Play It
+// ✅ Detect When Streaming Starts
 peerConnection.ontrack = event => {
-    console.log("🎙 Received Audio Stream!");
-    playReceivedAudio(event.streams[0]);
+    console.log("🎙 Received WebRTC Stereo Opus Stream!");
+    playReceivedAudio(event.streams[0]); // Calls function in receiver.js
+};
+
+// 🔄 Detect When ICE Connection Is Established
+peerConnection.oniceconnectionstatechange = () => {
+    console.log("🔄 ICE Connection State:", peerConnection.iceConnectionState);
+    if (peerConnection.iceConnectionState === "connected") {
+        console.log("✅ Streaming has started! WebRTC connection established.");
+    }
 };
 
 // 📡 Handles ICE Candidate Exchange
@@ -42,11 +62,3 @@ async function setAnswer() {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     console.log("✅ SDP Answer Set! Connection Established.");
 }
-
-// 🔄 Detect When ICE Connection Is Established
-peerConnection.oniceconnectionstatechange = () => {
-    console.log("🔄 ICE Connection State:", peerConnection.iceConnectionState);
-    if (peerConnection.iceConnectionState === "connected") {
-        console.log("✅ Streaming has started! WebRTC connection established.");
-    }
-};
