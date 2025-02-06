@@ -1,43 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-us">
 <head>
-    <meta charset="UTF-8">
-    <title>WebRTC Receiver</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>SMPL HearSay - Receiver</title>
+    <link href="app.css" rel="stylesheet" type="text/css">
 </head>
 <body>
-    <h2>Paste Caller's Offer</h2>
-    <textarea id="offer"></textarea>
-    <button onclick="setOffer()">Set Offer</button>
 
-    <h2>Receiver (Generate Answer)</h2>
-    <button onclick="createAnswer()">Create Answer</button>
-    <textarea id="answer"></textarea>
-    <button onclick="copyAnswer()">Copy Answer</button>
+    <div class="wrapper">
+        <header>
+            <h1>WebRTC Receiver</h1>
+        </header>
 
-    <script>
-        let peerConnection = new RTCPeerConnection({ iceServers: [] });
+        <h2>WebRTC Connection</h2>
+        <textarea id="offer" placeholder="Paste Caller’s SDP Offer here"></textarea>
+        <button onclick="setOffer()">Set Offer</button>
 
-        peerConnection.onicecandidate = event => {
-            if (event.candidate) {
-                console.log("📡 ICE Candidate:", event.candidate.candidate);
-            }
-        };
+        <button onclick="createAnswer()">Create Answer</button>
+        <textarea id="answer" placeholder="Generated SDP Answer will appear here"></textarea>
+        <button onclick="copyAnswer()">Copy Answer</button>
 
-        async function setOffer() {
-            let offer = JSON.parse(document.getElementById("offer").value);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-            console.log("📡 Offer Set!");
-        }
+        <h2>Received Audio</h2>
+        <audio id="receivedAudio" controls autoplay></audio>
 
-        async function createAnswer() {
-            let answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            document.getElementById("answer").value = JSON.stringify(answer);
-        }
+        <h2>Recording</h2>
+        <button onclick="startRecording()">Start Recording</button>
+        <button onclick="stopRecording()">Stop Recording</button>
+        <a id="downloadLink" style="display:none">Download Recorded Audio</a>
 
-        function copyAnswer() {
-            navigator.clipboard.writeText(document.getElementById("answer").value);
-        }
-    </script>
+    </div>
+
+    <script src="webrtc.js"></script>
+    <script src="receiver.js"></script>
+    <script src="recorder.js"></script>
+
 </body>
 </html>
