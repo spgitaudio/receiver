@@ -42,3 +42,11 @@ async function setAnswer() {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     console.log("✅ SDP Answer Set! Connection Established.");
 }
+
+// 🔄 Detect When ICE Connection Is Established
+peerConnection.oniceconnectionstatechange = () => {
+    console.log("🔄 ICE Connection State:", peerConnection.iceConnectionState);
+    if (peerConnection.iceConnectionState === "connected") {
+        console.log("✅ Streaming has started! WebRTC connection established.");
+    }
+};
