@@ -12,7 +12,7 @@ peerConnection.onicecandidate = event => {
 function forceOpusSDP(sdp) {
     console.log("🔧 Modifying SDP for Opus Stereo Decoding...");
     return sdp
-        .replace(/a=rtpmap:\d+ opus\/\d+/g, "a=rtpmap:111 opus/48000/2") // Force Opus codec with stereo
+        .replace(/a=rtpmap:\d+ opus\/\d+/g, "a=rtpmap:111 opus/48000") // Force Opus codec with stereo
         .replace(/a=fmtp:\d+ /g, "a=fmtp:111 stereo=1; sprop-stereo=1; ") // Ensure stereo Opus
         .replace(/a=sendrecv/g, "a=recvonly"); // Receiver only receives media
 }
