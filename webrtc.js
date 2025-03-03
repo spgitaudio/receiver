@@ -14,7 +14,7 @@ function forceOpusSDP(sdp) {
     return sdp
         .replace(/a=rtpmap:\d+ opus\/\d+/g, "a=rtpmap:111 opus/48000") // Force Opus codec with stereo
         .replace(/a=fmtp:\d+ /g, "a=fmtp:111 stereo=1; sprop-stereo=1; ") // Ensure stereo Opus
-        .replace(/a=sendrecv/g, "a=recvonly"); // Receiver only receives media
+        .replace(/a=recvonly/g, "a=recvonly"); // Receiver only receives media
 }
 
 // 📡 Accept SDP Offer from Caller
