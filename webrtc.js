@@ -36,20 +36,20 @@ async function createAnswer() {
 }
 
 // ✅ Detect When Streaming Starts
-//peerConnection.ontrack = event => {
-//    console.log("🎙 Received WebRTC Stereo Opus Stream!");
-//    playReceivedAudio(event.streams[0]); // Calls function in receiver.js
-//};
 peerConnection.ontrack = event => {
     console.log("🎙 Received WebRTC Stereo Opus Stream!");
-
-    // Store the incoming stream
-    receivedStream = event.streams[0];
-
-    // Automatically start recording
-    console.log("🎙 Auto-starting recording...");
-    startRecordingStream(receivedStream); // Calls function in recorder.js for receiver
+    playReceivedAudio(event.streams[0]); // Calls function in receiver.js
 };
+//peerConnection.ontrack = event => {
+//    console.log("🎙 Received WebRTC Stereo Opus Stream!");
+//
+//    // Store the incoming stream
+//    receivedStream = event.streams[0];
+//
+//    // Automatically start recording
+//    console.log("🎙 Auto-starting recording...");
+//    startRecordingStream(receivedStream); // Calls function in recorder.js for receiver
+//};
 
 // 🔄 Detect When ICE Connection Is Established
 peerConnection.oniceconnectionstatechange = () => {
