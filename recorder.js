@@ -19,6 +19,44 @@ let recordedChunks = [];
 //    console.log("🎙 Recording started... (Saving as WAV)");
 //}
 
+//function startRecordingStream(stream) {
+//    if (!stream || stream.getAudioTracks().length === 0) {
+//        console.error("❌ No valid audio stream available for recording!");
+//        return;
+//    }
+//
+//    let audioTrack = stream.getAudioTracks()[0];
+//
+//    console.log(`🎤 Checking received audio: ID=${audioTrack.id}, Enabled=${audioTrack.enabled}, Muted=${audioTrack.muted}`);
+//
+//    // ✅ Wait until actual audio samples arrive before starting recording
+//    let checkAudioInterval = setInterval(() => {
+//        if (!audioTrack.muted) { // ✅ Only start if audio is NOT muted
+//            console.log("📡 ✅ Audio samples detected! Starting recording...");
+//            clearInterval(checkAudioInterval); // ✅ Stop checking once recording starts
+//
+//            // 🔹 Start recording only after real audio is detected
+//            recordedChunks = [];
+//            mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+//
+//            mediaRecorder.ondataavailable = event => {
+//                if (event.data.size > 0) {
+//                    recordedChunks.push(event.data);
+//                    console.log(`🎧 Recorded data chunk: ${event.data.size} bytes`);
+//                } else {
+//                    console.warn("⚠ Received empty data chunk!");
+//                }
+//            };
+//
+//            mediaRecorder.onstop = saveRecordingAsWav;
+//            mediaRecorder.start();
+//            console.log("🎙 Recording started... (Saving as WAV)");
+//        } else {
+//            console.warn("⚠ Waiting for actual audio samples...");
+//        }
+//    }, 1000); // Retry every 1 second
+//}
+
 function startRecordingStream(stream) {
     if (!stream || stream.getAudioTracks().length === 0) {
         console.error("❌ No valid audio stream available for recording!");
@@ -48,7 +86,11 @@ function startRecordingStream(stream) {
                 }
             };
 
-            mediaRecorder.onstop = saveRecordingAsWav;
+            mediaRecorder.onstop = () => {
+                console.log("🛑 Recording stopped. Total chunks recorded:", recordedChunks.length);
+                saveRecordingAsWav();
+            };
+
             mediaRecorder.start();
             console.log("🎙 Recording started... (Saving as WAV)");
         } else {
@@ -66,37 +108,72 @@ function stopRecordingStream() {
 }
 
 // 💾 Convert WebM to WAV & Save
+//function saveRecordingAsWav() {
+//    if (recordedChunks.length === 0) {
+//        console.error("❌ No recorded data available! Cannot decode.");
+//        return;
+//    }
+//
+//    console.log("💾 Saving recorded WebRTC audio...");
+//    const blob = new Blob(recordedChunks, { type: "audio/webm" });
+//
+//    // Convert WebM Blob to WAV using Web Audio API
+//    let fileReader = new FileReader();
+//    fileReader.readAsArrayBuffer(blob);
+//
+////    fileReader.onloadend = () => {
+////        let audioContext = new AudioContext();
+////        audioContext.decodeAudioData(fileReader.result, buffer => {
+////            let wavBuffer = encodeWav(buffer);
+////            let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+////
+////            // Create download link
+////            const url = URL.createObjectURL(wavBlob);
+////            const downloadLink = document.getElementById("downloadLink");
+////
+////            filename = "received_audio.wav"
+////            downloadLink.href = url;
+////            downloadLink.download = filename;
+////            downloadLink.style.display = "block";
+////            downloadLink.textContent = "Download Recorded WAV";
+////            console.log(`✅ File ready: ${filename}`);
+////        });
+////    };
+//
+//    fileReader.onloadend = () => {
+//        let audioContext = new AudioContext();
+//
+//        audioContext.decodeAudioData(fileReader.result)
+//            .then(buffer => {
+//                let wavBuffer = encodeWav(buffer);
+//                let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+//
+//                filename = "received_audio.wav"
+//                downloadLink.href = url;
+//                downloadLink.download = filename;
+//                downloadLink.style.display = "block";
+//                downloadLink.textContent = "Download Recorded WAV";
+//                console.log(`✅ File ready: ${filename}`);
+//            })
+//            .catch(error => {
+//                console.error("❌ Error decoding WebM audio:", error);
+//                console.error("⚠ Possible cause: Empty or corrupted recording.");
+//            });
+//    };
+//
+//}
+
 function saveRecordingAsWav() {
     if (recordedChunks.length === 0) {
         console.error("❌ No recorded data available! Cannot decode.");
         return;
     }
 
-    console.log("💾 Saving recorded WebRTC audio...");
+    console.log(`💾 Saving ${recordedChunks.length} chunks of recorded WebRTC audio...`);
     const blob = new Blob(recordedChunks, { type: "audio/webm" });
 
-    // Convert WebM Blob to WAV using Web Audio API
     let fileReader = new FileReader();
     fileReader.readAsArrayBuffer(blob);
-
-//    fileReader.onloadend = () => {
-//        let audioContext = new AudioContext();
-//        audioContext.decodeAudioData(fileReader.result, buffer => {
-//            let wavBuffer = encodeWav(buffer);
-//            let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
-//
-//            // Create download link
-//            const url = URL.createObjectURL(wavBlob);
-//            const downloadLink = document.getElementById("downloadLink");
-//
-//            filename = "received_audio.wav"
-//            downloadLink.href = url;
-//            downloadLink.download = filename;
-//            downloadLink.style.display = "block";
-//            downloadLink.textContent = "Download Recorded WAV";
-//            console.log(`✅ File ready: ${filename}`);
-//        });
-//    };
 
     fileReader.onloadend = () => {
         let audioContext = new AudioContext();
@@ -105,6 +182,10 @@ function saveRecordingAsWav() {
             .then(buffer => {
                 let wavBuffer = encodeWav(buffer);
                 let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+
+                // ✅ Create a download link
+                const url = URL.createObjectURL(wavBlob);
+                const downloadLink = document.getElementById("downloadLink");
 
                 filename = "received_audio.wav"
                 downloadLink.href = url;
@@ -118,7 +199,6 @@ function saveRecordingAsWav() {
                 console.error("⚠ Possible cause: Empty or corrupted recording.");
             });
     };
-
 }
 
 // 🎙 WAV Encoding Function (Stereo Support)
