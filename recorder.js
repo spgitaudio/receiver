@@ -29,30 +29,58 @@ function stopRecordingStream() {
 
 // 💾 Convert WebM to WAV & Save
 function saveRecordingAsWav() {
+    if (recordedChunks.length === 0) {
+        console.error("❌ No recorded data available! Cannot decode.");
+        return;
+    }
+
+    console.log("💾 Saving recorded WebRTC audio...");
     const blob = new Blob(recordedChunks, { type: "audio/webm" });
 
     // Convert WebM Blob to WAV using Web Audio API
     let fileReader = new FileReader();
     fileReader.readAsArrayBuffer(blob);
 
+//    fileReader.onloadend = () => {
+//        let audioContext = new AudioContext();
+//        audioContext.decodeAudioData(fileReader.result, buffer => {
+//            let wavBuffer = encodeWav(buffer);
+//            let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+//
+//            // Create download link
+//            const url = URL.createObjectURL(wavBlob);
+//            const downloadLink = document.getElementById("downloadLink");
+//
+//            filename = "received_audio.wav"
+//            downloadLink.href = url;
+//            downloadLink.download = filename;
+//            downloadLink.style.display = "block";
+//            downloadLink.textContent = "Download Recorded WAV";
+//            console.log(`✅ File ready: ${filename}`);
+//        });
+//    };
+
     fileReader.onloadend = () => {
         let audioContext = new AudioContext();
-        audioContext.decodeAudioData(fileReader.result, buffer => {
-            let wavBuffer = encodeWav(buffer);
-            let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
 
-            // Create download link
-            const url = URL.createObjectURL(wavBlob);
-            const downloadLink = document.getElementById("downloadLink");
+        audioContext.decodeAudioData(fileReader.result)
+            .then(buffer => {
+                let wavBuffer = encodeWav(buffer);
+                let wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
 
-            filename = "received_audio.wav"
-            downloadLink.href = url;
-            downloadLink.download = filename;
-            downloadLink.style.display = "block";
-            downloadLink.textContent = "Download Recorded WAV";
-            console.log(`✅ File ready: ${filename}`);
-        });
+                filename = "received_audio.wav"
+                downloadLink.href = url;
+                downloadLink.download = filename;
+                downloadLink.style.display = "block";
+                downloadLink.textContent = "Download Recorded WAV";
+                console.log(`✅ File ready: ${filename}`);
+            })
+            .catch(error => {
+                console.error("❌ Error decoding WebM audio:", error);
+                console.error("⚠ Possible cause: Empty or corrupted recording.");
+            });
     };
+
 }
 
 // 🎙 WAV Encoding Function (Stereo Support)
@@ -110,9 +138,3 @@ function writeString(view, offset, string) {
     }
 }
 
-// 📝 Write ASCII Characters to WAV Header
-function writeString(view, offset, string) {
-    for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-    }
-}
