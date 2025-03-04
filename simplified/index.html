@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC Server</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            display: flex;
+            flex-direction: column;
+        }
+        .main-container {
+            display: flex;
+            gap: 20px;
+        }
+        .controls, .logs {
+            flex: 1;
+        }
+        #consoleLog {
+            height: 300px;
+            border: 1px solid #ccc;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            font-family: monospace;
+            padding: 10px;
+            background-color: #f4f4f4;
+        }
+        button { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="controls">
+            <h1>WebRTC Server</h1>
+            
+            <div>
+                <button id="setOfferBtn">Set Offer</button>
+                <textarea id="offerText" rows="10" cols="50" placeholder="Paste Client Offer SDP"></textarea>
+            </div>
+            
+            <div>
+                <button id="createAnswerBtn">Create Answer</button>
+                <textarea id="answerText" rows="10" cols="50" placeholder="Generated Answer SDP"></textarea>
+            </div>
+
+            <div>
+                <input type="file" id="saveLocationPicker" webkitdirectory directory multiple={false} />
+                <button id="saveFileBtn" disabled>Save Received Audio</button>
+            </div>
+        </div>
+        
+        <div class="logs">
+            <h2>Console Log</h2>
+            <div id="consoleLog"></div>
+        </div>
+    </div>
+
+    <script>
+        // Custom logging function with enhanced features
+        const consoleLog = (message, type = 'info') => {
+            const logElement = document.getElementById('consoleLog');
+            const logEntry = document.createElement('div');
+            
+            // Create timestamp
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Style log entry based on type
+            switch(type) {
+                case 'error': 
+                    logEntry.style.color = 'red';
+                    logEntry.textContent = `[ERROR] ${timestamp} - ${message}`;
+                    break;
+                case 'warn': 
+                    logEntry.style.color = 'orange';
+                    logEntry.textContent = `[WARN] ${timestamp} - ${message}`;
+                    break;
+                case 'success': 
+                    logEntry.style.color = 'green';
+                    logEntry.textContent = `[SUCCESS] ${timestamp} - ${message}`;
+                    break;
+                case 'connection': 
+                    logEntry.style.color = 'blue';
+                    logEntry.textContent = `[CONNECTION] ${timestamp} - ${message}`;
+                    break;
+                default:
+                    logEntry.style.color = 'black';
+                    logEntry.textContent = `[INFO] ${timestamp} - ${message}`;
+            }
+            
+            // Add new log entry
+            logElement.appendChild(logEntry);
+            
+            // Keep only last 10 log entries
+            while (logElement.children.length > 10) {
+                logElement.removeChild(logElement.firstChild);
+            }
+            
+            // Auto-scroll to bottom
+            logElement.scrollTop = logElement.scrollHeight;
+        };
+
+        // Global variables
+        let peerConnection = null;
+        let mediaRecorder = null;
+        const audioChunks = [];
+        let saveDirectory = null;
+        let rtpStatsInterval = null;
+
+        // Detailed RTP Stats Tracking
+        function startRtpStatsTracking() {
+            // Clear any existing interval
+            if (rtpStatsInterval) {
+                clearInterval(rtpStatsInterval);
+            }
+
+            rtpStatsInterval = setInterval(async () => {
+                if (!peerConnection) return;
+
+                try {
+                    const receivers = peerConnection.getReceivers();
+                    for (const receiver of receivers) {
+                        if (receiver.track) {
+                            const stats = await receiver.getStats();
+                            stats.forEach(stat => {
+                                if (stat.type === 'inbound-rtp') {
+                                    consoleLog(`RTP Receiver Stats:
+- Track Kind: ${receiver.track.kind}
+- Packets Received: ${stat.packetsReceived}
+- Bytes Received: ${stat.bytesReceived}
+- Jitter: ${stat.jitter}
+- Codec: ${stat.mimeType}`, 'info');
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    consoleLog(`RTP Stats Tracking Error: ${error.message}`, 'error');
+                }
+            }, 5000);
+        }
+
+        // Initialize WebRTC Peer Connection
+        function initPeerConnection() {
+            // Detailed configuration
+            const configuration = {
+                iceServers: [],  // No STUN/TURN servers for local connection
+                sdpSemantics: 'unified-plan'
+            };
+
+            // Create peer connection
+            peerConnection = new RTCPeerConnection(configuration);
+
+            // Detailed connection state tracking
+            peerConnection.onconnectionstatechange = () => {
+                consoleLog(`Connection State: ${peerConnection.connectionState}`, 'connection');
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                consoleLog(`ICE Connection State: ${peerConnection.iceConnectionState}`, 'connection');
+            };
+
+            peerConnection.onicegatheringstatechange = () => {
+                consoleLog(`ICE Gathering State: ${peerConnection.iceGatheringState}`, 'connection');
+            };
+
+            peerConnection.onsignalingstatechange = () => {
+                consoleLog(`Signaling State: ${peerConnection.signalingState}`, 'connection');
+            };
+
+            // Handle incoming tracks
+            peerConnection.ontrack = (event) => {
+                const receivedStream = event.streams[0];
+                consoleLog('Incoming audio track received', 'success');
+                
+                // Configure media recorder
+                mediaRecorder = new MediaRecorder(receivedStream, { 
+                    mimeType: 'audio/webm',
+                    audioBitsPerSecond: 128000 
+                });
+
+                // Collect audio chunks
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                // Auto-save when recording stops
+                mediaRecorder.onstop = async () => {
+                    if (audioChunks.length > 0) {
+                        await saveReceivedAudio();
+                    }
+                };
+
+                // Start recording
+                mediaRecorder.start();
+
+                // Start RTP stats tracking
+                startRtpStatsTracking();
+            };
+
+            return peerConnection;
+        }
+
+        // Save Location Picker
+        document.getElementById('saveLocationPicker').addEventListener('change', (e) => {
+            const selectedFolder = e.target.files[0].webkitRelativePath.split('/')[0];
+            saveDirectory = selectedFolder;
+            consoleLog(`Save directory selected: ${selectedFolder}`, 'success');
+            document.getElementById('saveFileBtn').disabled = false;
+        });
+
+        // Manual Save Button
+        document.getElementById('saveFileBtn').addEventListener('click', async () => {
+            if (audioChunks.length === 0) {
+                consoleLog('No audio data to save', 'warn');
+                return;
+            }
+            await saveReceivedAudio();
+        });
+
+        // Save Received Audio Function
+        async function saveReceivedAudio() {
+            try {
+                // Create blob from collected chunks
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                
+                // Generate unique filename
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `received_audio_${timestamp}.webm`;
+
+                // Determine save method based on directory selection
+                if (saveDirectory) {
+                    // Use directory picker
+                    const dirHandle = await window.showDirectoryPicker();
+                    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    
+                    await writable.write(arrayBuffer);
+                    await writable.close();
+                    
+                    consoleLog(`Audio saved: ${filename} in selected directory`, 'success');
+                } else {
+                    // Fallback to file save dialog
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        types: [{
+                            description: 'WebM Audio File',
+                            accept: {'audio/webm': ['.webm']}
+                        }],
+                    });
+
+                    const writable = await handle.createWritable();
+                    await writable.write(arrayBuffer);
+                    await writable.close();
+                    
+                    consoleLog(`Audio saved: ${filename}`, 'success');
+                }
+
+                // Clear audio chunks
+                audioChunks.length = 0;
+            } catch (error) {
+                consoleLog(`File save error: ${error.message}`, 'error');
+            }
+        }
+
+        // Set Offer Button Handler
+        document.getElementById('setOfferBtn').addEventListener('click', async () => {
+            try {
+                const offerSdp = document.getElementById('offerText').value;
+                const offer = new RTCSessionDescription({ type: 'offer', sdp: offerSdp });
+                
+                // Initialize peer connection
+                peerConnection = initPeerConnection();
+                
+                // Set remote description
+                await peerConnection.setRemoteDescription(offer);
+                consoleLog('Offer set successfully', 'success');
+            } catch (error) {
+                consoleLog(`Set offer error: ${error.message}`, 'error');
+            }
+        });
+
+        // Create Answer Button Handler
+        document.getElementById('createAnswerBtn').addEventListener('click', async () => {
+            try {
+                // Answer creation options
+                const answerOptions = {
+                    offerToReceiveAudio: true,
+                    voiceActivityDetection: false
+                };
+
+                // Create and set local description
+                const answer = await peerConnection.createAnswer(answerOptions);
+                await peerConnection.setLocalDescription(answer);
+                
+                // Display answer SDP
+                document.getElementById('answerText').value = answer.sdp;
+                consoleLog('Answer created successfully', 'success');
+            } catch (error) {
+                consoleLog(`Answer creation error: ${error.message}`, 'error');
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            // Clear RTP stats interval
+            if (rtpStatsInterval) {
+                clearInterval(rtpStatsInterval);
+            }
+
+            // Close peer connection
+            if (peerConnection) {
+                peerConnection.close();
+            }
+
+            // Stop media recorder
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        });
+    </script>
+</body>
+</html>
