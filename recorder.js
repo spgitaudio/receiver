@@ -2,21 +2,59 @@ let mediaRecorder;
 let recordedChunks = [];
 
 // 🎙 Start recording received WebRTC stream
+//function startRecordingStream(stream) {
+//    recordedChunks = [];
+//
+//    // 🔹 Convert to WAV Instead of WebM
+//    mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+//
+//    mediaRecorder.ondataavailable = event => {
+//        if (event.data.size > 0) {
+//            recordedChunks.push(event.data);
+//        }
+//    };
+//
+//    mediaRecorder.onstop = saveRecordingAsWav;
+//    mediaRecorder.start();
+//    console.log("🎙 Recording started... (Saving as WAV)");
+//}
+
 function startRecordingStream(stream) {
-    recordedChunks = [];
+    if (!stream || stream.getAudioTracks().length === 0) {
+        console.error("❌ No valid audio stream available for recording!");
+        return;
+    }
 
-    // 🔹 Convert to WAV Instead of WebM
-    mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    let audioTrack = stream.getAudioTracks()[0];
 
-    mediaRecorder.ondataavailable = event => {
-        if (event.data.size > 0) {
-            recordedChunks.push(event.data);
+    console.log(`🎤 Checking received audio: ID=${audioTrack.id}, Enabled=${audioTrack.enabled}, Muted=${audioTrack.muted}`);
+
+    // ✅ Wait until actual audio samples arrive before starting recording
+    let checkAudioInterval = setInterval(() => {
+        if (!audioTrack.muted) { // ✅ Only start if audio is NOT muted
+            console.log("📡 ✅ Audio samples detected! Starting recording...");
+            clearInterval(checkAudioInterval); // ✅ Stop checking once recording starts
+
+            // 🔹 Start recording only after real audio is detected
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                    console.log(`🎧 Recorded data chunk: ${event.data.size} bytes`);
+                } else {
+                    console.warn("⚠ Received empty data chunk!");
+                }
+            };
+
+            mediaRecorder.onstop = saveRecordingAsWav;
+            mediaRecorder.start();
+            console.log("🎙 Recording started... (Saving as WAV)");
+        } else {
+            console.warn("⚠ Waiting for actual audio samples...");
         }
-    };
-
-    mediaRecorder.onstop = saveRecordingAsWav;
-    mediaRecorder.start();
-    console.log("🎙 Recording started... (Saving as WAV)");
+    }, 1000); // Retry every 1 second
 }
 
 // 🛑 Stop recording & save the file
