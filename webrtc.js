@@ -36,10 +36,10 @@ async function createAnswer() {
 }
 
 // ✅ Detect When Streaming Starts
-peerConnection.ontrack = event => {
-    console.log("🎙 Received WebRTC Stereo Opus Stream!");
-    playReceivedAudio(event.streams[0]); // Calls function in receiver.js
-};
+//peerConnection.ontrack = event => {
+//    console.log("🎙 Received WebRTC Stereo Opus Stream!");
+//    playReceivedAudio(event.streams[0]); // Calls function in receiver.js
+//};
 //peerConnection.ontrack = event => {
 //    console.log("🎙 Received WebRTC Stereo Opus Stream!");
 //
@@ -50,6 +50,32 @@ peerConnection.ontrack = event => {
 //    console.log("🎙 Auto-starting recording...");
 //    startRecordingStream(receivedStream); // Calls function in recorder.js for receiver
 //};
+
+peerConnection.ontrack = event => {
+    console.log("🎙 Received WebRTC Stereo Opus Stream!");
+
+    receivedStream = event.streams[0];
+
+    if (!receivedStream || receivedStream.getAudioTracks().length === 0) {
+        console.warn("⚠ No valid audio stream detected!");
+        return;
+    }
+
+    let audioTrack = receivedStream.getAudioTracks()[0];
+
+    console.log(`🎤 Track ID: ${audioTrack.id}, Enabled: ${audioTrack.enabled}, Muted: ${audioTrack.muted}`);
+
+    // ✅ Wait for Audio Data Before Starting Recording
+    let checkAudioInterval = setInterval(() => {
+        if (!audioTrack.muted) { // ✅ Only start if audio is not muted
+            console.log("📡 ✅ Audio samples detected! Starting recording...");
+            startRecordingStream(receivedStream);
+            clearInterval(checkAudioInterval); // ✅ Stop checking once recording starts
+        } else {
+            console.warn("⚠ Waiting for audio samples...");
+        }
+    }, 1000); // Check every 1 second
+};
 
 // 🔄 Detect When ICE Connection Is Established
 peerConnection.oniceconnectionstatechange = () => {

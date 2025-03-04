@@ -21,9 +21,17 @@ function playReceivedAudio(stream) {
 }
 
 // 🎙 Start recording received audio
+//function startRecording() {
+//    if (!receivedStream) {
+//        console.warn("⚠ No incoming stream yet!");
+//        return;
+//    }
+//    startRecordingStream(receivedStream);
+//}
 function startRecording() {
-    if (!receivedStream) {
-        console.warn("⚠ No incoming stream yet!");
+    if (!receivedStream || receivedStream.getAudioTracks().length === 0) {
+        console.warn("⚠ No incoming stream yet! Waiting for audio...manually retry pressing record in 1 sec");
+        setTimeout(startRecording, 1000); // ✅ Delay retry by 1 sec
         return;
     }
     startRecordingStream(receivedStream);
