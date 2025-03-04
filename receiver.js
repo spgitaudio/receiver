@@ -11,6 +11,7 @@ let receivedStream;
 function playReceivedAudio(stream) {
     let audioContext = new AudioContext();
     let source = audioContext.createMediaStreamSource(stream);
+    receivedStream = stream;
 
     console.log("🎙 WebRTC Received Stream:", stream);
     console.log("🎚 WebRTC Audio Tracks:", stream.getAudioTracks().length);
