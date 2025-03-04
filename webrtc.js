@@ -72,3 +72,15 @@ async function setAnswer() {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     console.log("✅ SDP Answer Set! Connection Established.");
 }
+
+function checkConnectionStatus() {
+    if (!peerConnection) {
+        console.log("❌ WebRTC connection is not initialized.");
+        return;
+    }
+
+    console.log("🔄 Checking WebRTC Connection Status...");
+    console.log("🔄 ICE Connection State:", peerConnection.iceConnectionState);
+    console.log("🔄 Signaling State:", peerConnection.signalingState);
+    console.log("🔄 Connection State:", peerConnection.connectionState);
+}
