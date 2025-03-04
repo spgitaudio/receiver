@@ -45,10 +45,12 @@ function saveRecordingAsWav() {
             const url = URL.createObjectURL(wavBlob);
             const downloadLink = document.getElementById("downloadLink");
 
+            filename = "received_audio.wav"
             downloadLink.href = url;
-            downloadLink.download = "received_audio.wav";
+            downloadLink.download = filename;
             downloadLink.style.display = "block";
             downloadLink.textContent = "Download Recorded WAV";
+            console.log(`✅ File ready: ${filename}`);
         });
     };
 }
